@@ -5,6 +5,7 @@ Intended to be run single GPU only atm:
 python -m scripts.chat_cli -i mid
 """
 import argparse
+import contextlib
 import torch
 from nanochat.common import compute_init
 from nanochat.engine import Engine
@@ -17,12 +18,51 @@ parser.add_argument('-s', '--step', type=int, default=None, help='Step to load')
 parser.add_argument('-p', '--prompt', type=str, default='', help='Prompt the model, get a single response back')
 parser.add_argument('-t', '--temperature', type=float, default=0.6, help='Temperature for generation')
 parser.add_argument('-k', '--top-k', type=int, default=50, help='Top-k sampling parameter')
+parser.add_argument(
+    '-d', '--device',
+    type=str,
+    default='auto',
+    choices=['auto', 'cuda', 'cpu'],
+    help="Device to run inference on (default: auto-detect CUDA, else CPU)"
+)
 args = parser.parse_args()
 
 # Init the model and tokenizer
-ddp, ddp_rank, ddp_local_rank, ddp_world_size, device = compute_init()
-autocast_ctx = torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16)
-model, tokenizer, meta = load_model(args.source, device, phase="eval", model_tag=args.model_tag, step=args.step)
+if args.device == 'auto':
+    target_device = 'cuda' if torch.cuda.is_available() else 'cpu'
+else:
+    target_device = args.device
+
+autocast_ctx = contextlib.nullcontext()
+if target_device == 'cuda':
+    ddp, ddp_rank, ddp_local_rank, ddp_world_size, device = compute_init()
+    autocast_ctx = torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16)
+else:
+    if args.device == 'cuda':
+        raise RuntimeError("CUDA was requested explicitly but is not available.")
+    ddp = False
+    ddp_rank = ddp_local_rank = 0
+    ddp_world_size = 1
+    device = torch.device("cpu")
+    torch.manual_seed(42)
+    print("Running chat_cli on CPU. Generation will be significantly slower.")
+
+try:
+    model, tokenizer, meta = load_model(args.source, device, phase="eval", model_tag=args.model_tag, step=args.step)
+except torch.cuda.OutOfMemoryError as oom:
+    if target_device == 'cuda' and args.device == 'auto':
+        print("CUDA out of memory while loading the model. Falling back to CPU. Generation will be significantly slower.")
+        torch.cuda.empty_cache()
+        target_device = 'cpu'
+        ddp = False
+        ddp_rank = ddp_local_rank = 0
+        ddp_world_size = 1
+        device = torch.device("cpu")
+        torch.manual_seed(42)
+        autocast_ctx = contextlib.nullcontext()
+        model, tokenizer, meta = load_model(args.source, device, phase="eval", model_tag=args.model_tag, step=args.step)
+    else:
+        raise oom
 
 # Special tokens for the chat state machine
 bos = tokenizer.get_bos_token_id()

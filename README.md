@@ -1,86 +1,129 @@
-# nanoAction
+# nanochat
 
-![nanoaction logo](dev/nanoaction.png)
+![nanochat logo](dev/nanochat.png)
 
-> The best VLA that $500 can buy for a $500 robot
+> The best ChatGPT that $100 can buy.
 
-This repo will directly extend off of the [nanochat](https://github.com/karpathy/nanochat) repo, and will be a full-stack implementation of a VLA trained on a corpus of robotics data.  This script will generate a light-weight VLA that can be used to control, single camera, low DOF robots.
+This repo is a full-stack implementation of an LLM like ChatGPT in a single, clean, minimal, hackable, dependency-lite codebase. nanochat is designed to run on a single 8XH100 node via scripts like [speedrun.sh](speedrun.sh), that run the entire pipeline start to end. This includes tokenization, pretraining, finetuning, evaluation, inference, and web serving over a simple UI so that you can talk to your own LLM just like ChatGPT. nanochat will become the capstone project of the course LLM101n being developed by Eureka Labs.
 
-We will make the enhancements to the nanochat repo:
+## Quick start
 
-1. Add a vision encoder to the model
-   - v1 will use an existing encoder
-   - v2 will train a custom encoder
-2. Add an action head to the model in the spirit of [Pi0.5](https://github.com/Physical-Intelligence/openpi)
-   - Train on a corpus of robotics data
-3. Finetune the model for a specific model in IsaacSim
-   - v1 Koch Robot arm with wrist camera
-4. Record a corpus of robotics data from a real robot
-   - v1 finetune on the corpus on live robot
+The fastest way to feel the magic is to run the speedrun script [speedrun.sh](speedrun.sh), which trains and inferences the $100 tier of nanochat. On an 8XH100 node at $24/hr, this gives a total run time of about 4 hours. Boot up a new 8XH100 GPU box from your favorite provider (e.g. I use and like [Lambda](https://lambda.ai/service/gpu-cloud)), and kick off the training script:
 
-A major goal of this is to create a basic foundational robotics policy to run on 3d printed open source hardware.
-
-- $250 [Jetson Orin Nano Super](https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/nano-super-developer-kit/)
-- ~$250 3d printed arm - Like the [Koch arm](https://www.robotis.us/koch-v1-1-low-cost-robot-arm-follower/) or [SO-ARM100](https://github.com/TheRobotStudio/SO-ARM100)
-
-We will reference best practices of the LeRobot team and community to make this VLA compatible with the LeRobot ecosystem.
-
-Additional references:
-
-- <https://huggingface.co/lerobot/pi05_base>
-- <https://github.com/Physical-Intelligence/openpi>
-- <https://lei-kun.github.io/RL-100/> [pdf](https://lei-kun.github.io/RL-100/RL100_files/our_tasks/RL_100.pdf)
-
-Background Knowledge:
-
-- LeRobot Tutorial <https://huggingface.co/papers/2510.12403> [code](https://github.com/fracapuano/robot-learning-tutorial) [pdf](https://arxiv.org/pdf/2510.12403)
-- [NanoVLA: Routing Decoupled Vision-Language Understanding for Nano-sized Generalist Robotic Policies](https://openreview.net/forum?id=yeHBrNVZoV) [pdf](https://openreview.net/pdf?id=yeHBrNVZoV) and [code](https://anonymous.4open.science/r/nanovla-38EC/README.md)
-
-## Step 0: Starting from scratch
-
-Referencing [README-NANOCHAT.md](README-NANOCHAT.md) and [speedrun.sh](speedrun.sh), we will could from scratch.  However we will leverage some of the existing images from the community to make the process faster.
-
-We should be able to pull down a pre-trained model from the nanochat repo and use it as a starting point for our VLA
-
-- [karpathy/nanochat-d32](https://huggingface.co/karpathy/nanochat-d32) and [description](https://github.com/karpathy/nanochat/discussions/8)
-
-### Task list
-
-- [ ] Chat locally with the pre-trained model and confirm behavior is as expected
-- [ ] Compare architecture of nanochat to existing VLMs like (<https://huggingface.co/blog/nanovlm>) and VLAs like Pi0.5 and OpenVLA
-- [ ] Review initial VLM extensions of nanochat like [make nanochat multimodal for < $10!](https://x.com/_rajanagarwal/status/1978376536152785368)
-
-## Step 1: Working nanochat (with VL)
-
-The chat interface should accept one or more images and a text prompt.  The model should generate a response.
-
-## Step 2: Train on robotics data
-
-TODO
-
-## Step 3: Finetune on robotics data
-
-TODO
-
-## Step 4: Record robotics data
-
-TODO
-
-## Citation
-
-If you find nanoaction helpful in your research cite simply as:
-
-```bibtex
-@misc{nanoaction,
-  author = {Sean Kruzel},
-  title = {nanoaction: The best VLA that $500 can buy for a $500 robot},
-  year = {2025},
-  publisher = {GitHub},
-  url = {https://github.com/closedloop-tech/nanoaction}
-}
+```bash
+bash speedrun.sh
 ```
 
-A huge thanks to Andrej Karpathy for the nanochat repo and the nanochat-d32 model.
+Alternatively, since the script runs for 4 hours, I like to launch it like this inside a new screen session `speedrun` (and also log output to `speedrun.log`):
+
+```bash
+screen -L -Logfile speedrun.log -S speedrun bash speedrun.sh
+```
+
+See the [screen cheatsheet](https://gist.github.com/jctosta/af918e1618682638aa82) if you are less familiar. You can watch it go inside the screen session, or detach with `Ctrl-a d` and `tail speedrun.log` to view progress. Now wait 4 hours. Once it's done, you can talk to your LLM via the ChatGPT-like web UI. Make sure again that your local uv virtual environment is active (run `source .venv/bin/activate`), and serve it:
+
+```bash
+python -m scripts.chat_web
+```
+
+And then visit the URL shown. Make sure to access it correctly, e.g. on Lambda use the public IP of the node you're on, followed by the port, so for example [http://209.20.xxx.xxx:8000/](http://209.20.xxx.xxx:8000/), etc. Then talk to your LLM as you'd normally talk to ChatGPT! Get it to write stories or poems. Ask it to tell you who you are to see a hallucination. Ask it why the sky is blue. Or why it's green. The speedrun is a 4e19 FLOPs capability model so it's a bit like talking to a kindergartener :).
+
+---
+
+<img width="2672" height="1520" alt="image" src="https://github.com/user-attachments/assets/ed39ddf8-2370-437a-bedc-0f39781e76b5" />
+
+---
+
+You can also `cat report.md` file which appeared in the project directory and contains the "report card" of the run, i.e. a bunch of evaluations and metrics. At the very end, you'll see a summary table, for example:
+
+---
+
+- Characters: 333,989
+- Lines: 8,304
+- Files: 44
+- Tokens (approx): 83,497
+- Dependencies (uv.lock lines): 2,004
+
+| Metric          | BASE     | MID      | SFT      | RL       |
+|-----------------|----------|----------|----------|----------|
+| CORE            | 0.2219   | -        | -        | -        |
+| ARC-Challenge   | -        | 0.2875   | 0.2807   | -        |
+| ARC-Easy        | -        | 0.3561   | 0.3876   | -        |
+| GSM8K           | -        | 0.0250   | 0.0455   | 0.0758   |
+| HumanEval       | -        | 0.0671   | 0.0854   | -        |
+| MMLU            | -        | 0.3111   | 0.3151   | -        |
+| ChatCORE        | -        | 0.0730   | 0.0884   | -        |
+
+Total wall clock time: 3h51m
+
+---
+
+(Your table might be missing the RL number by default). For a lot more information around the speedrun script and what to look for and expect, please refer to the walkthrough that I posted in Discussions of the repo: ["Introducing nanochat: The best ChatGPT that $100 can buy"](https://github.com/karpathy/nanochat/discussions/1).
+
+## Bigger models
+
+Unsurprisingly, $100 is not enough to train a highly performant ChatGPT clone. In fact, LLMs are famous for their multi-million dollar capex. For our purposes, I think there are two more scales of interest. First is the ~$300 tier d26 model (i.e. depth=26) that trains in ~12 hours, which slightly outperforms GPT-2 CORE score. Second is the $1000 tier (~41.6 hours), just because it's a nice round number. But both of these are not yet fully supported and therefore not attached here in the master branch yet.
+
+That said, to give a sense, the example changes needed for the [speedrun.sh](speedrun.sh) file to train a GPT-2 grade model d26 only involve three changes:
+
+```bash
+...
+# you'll need to download more data shards for pretraining
+# get the number of parameters, multiply 20 to get tokens, multiply by 4.8 to get chars,
+# divide by 250 million to get number of shards. todo need to improve this...
+python -m nanochat.dataset -n 450 &
+...
+# use --depth to increase model size. to not oom, halve device batch size 32 -> 16:
+torchrun --standalone --nproc_per_node=8 -m scripts.base_train -- --depth=26 --device_batch_size=16
+...
+# make sure to use the same later during midtraining:
+torchrun --standalone --nproc_per_node=8 -m scripts.mid_train -- --device_batch_size=16
+```
+
+That's it! The biggest thing to pay attention to is making sure you have enough data shards to train on (the code will loop and do more epochs over the same training set otherwise, decreasing learning speed a bit), and managing your memory/VRAM, primarily by decreasing the `device_batch_size` until things fit (the scripts automatically compensates by increasing the number of gradient accumulation loops, simply turning parallel compute to sequential compute).
+
+And a bit more about computing environments that will run nanochat:
+
+- The code will run just fine on the Ampere 8XA100 GPU node as well, but a bit slower.
+- All code will run just fine on even a single GPU by omitting `torchrun`, and will produce ~identical results (code will automatically switch to gradient accumulation), but you'll have to wait 8 times longer.
+- If your GPU(s) have less than 80GB, you'll have to tune some of the hyperparameters or you will OOM / run out of VRAM. Look for `--device_batch_size` in the scripts and reduce it until things fit. E.g. from 32 (default) to 16, 8, 4, 2, or even 1. Less than that you'll have to know a bit more what you're doing and get more creative.
+- Most of the code is fairly vanilla PyTorch so it should run on anything that supports that - xpu, mps, or etc, but I haven't implemented this out of the box so it might take a bit of tinkering.
+
+## Questions
+
+nanochat is designed to be short and sweet. One big advantage of this is that we can package up all of the files together and copy paste them to your favorite LLM to ask arbitrary questions. As an example, I like to package up the repo using the [files-to-prompt](https://github.com/simonw/files-to-prompt) utility like so:
+
+```bash
+files-to-prompt . -e py -e md -e rs -e html -e toml -e sh --ignore "*target*" --cxml > packaged.txt
+```
+
+This includes all py, rs, html, toml, sh files, excludes the `rustbpe/target` folder, and chooses the cxml output format. Everything is written to the `packaged.txt` file, which atm measures ~330KB (i.e. well below ~100K tokens for a state of the art LLM), and ~8K lines of code in 45 files.
+
+Alternatively, I recommend using [DeepWiki](https://deepwiki.com/) from Devin/Cognition to ask questions of this repo. In the URL of this repo, simply change github.com to deepwiki.com, and you're off.
+
+## Tests
+
+I haven't invested too much here but some tests exist, especially for the tokenizer. Run e.g. as:
+
+```bash
+python -m pytest tests/test_rustbpe.py -v -s
+```
+
+## Contributing
+
+nanochat is nowhere finished. The goal is to improve the state of the art in micro models that are accessible to work with end to end on budgets of < $1000 dollars. Accessibility is about overall cost but also about cognitive complexity - nanochat is not an exhaustively configurable LLM "framework"; there will be no giant configuration objects, model factories, or if-then-else monsters in the code base. It is a single, cohesive, minimal, readable, hackable, maximally-forkable "strong baseline" codebase designed to run start to end and produce a concrete ChatGPT clone and its report card.
+
+## Acknowledgements
+
+- The name (nanochat) derives from my earlier project [nanoGPT](https://github.com/karpathy/nanoGPT), which only covered pretraining.
+- nanochat is also inspired by [modded-nanoGPT](https://github.com/KellerJordan/modded-nanogpt), which gamified the nanoGPT repo with clear metrics and a leaderboard, and borrows a lot of its ideas and some implementation for pretraining.
+- Thank you to [HuggingFace](https://huggingface.co/) for fineweb and smoltalk.
+- Thank you [Lambda](https://lambda.ai/service/gpu-cloud) for the compute used in developing this project.
+- Thank you to chief LLM whisperer 🧙‍♂️ Alec Radford for advice/guidance.
+
+## Cite
+
+If you find nanochat helpful in your research cite simply as:
 
 ```bibtex
 @misc{nanochat,
