@@ -10,11 +10,13 @@ dependencies = [
     "files-to-prompt>=0.6",
     "huggingface-hub>=0.34.4",
     "numpy==1.26.4",
+    "pillow>=12.0.0",
     "psutil>=7.1.0",
     "regex>=2025.9.1",
     "tiktoken>=0.11.0",
     "tokenizers>=0.22.0",
     "torch>=2.8.0",
+    "ultralytics>=8.0.0",
     "uvicorn>=0.36.0",
     "wandb>=0.21.3",
 ]
@@ -46,6 +48,7 @@ dev = [
     "pytest>=8.0.0",
 ]
 dx = [
+    "matplotlib>=3.10.7",
     "pillow>=12.0.0",
     "pyfiglet>=1.0.4",
 ]
