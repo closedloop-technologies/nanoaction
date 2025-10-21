@@ -1,0 +1,1 @@
+Run everything using `uv run` or in the .venv folder
