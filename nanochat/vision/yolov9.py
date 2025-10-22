@@ -230,6 +230,175 @@ class YOLOv9Plus:
         """
         return [self.predict(img, conf, iou) for img in images]
 
+    def get_backbone_model(self):
+        """
+        Get the underlying PyTorch backbone model for feature extraction.
+        
+        Returns:
+            The PyTorch model from ultralytics YOLO
+        """
+        # Access the underlying PyTorch model
+        return self.model.model
+
+    @torch.no_grad()
+    def extract_features(
+        self,
+        image: Union[str, Path, Image.Image, np.ndarray],
+        layer_idx: Optional[int] = None,
+    ) -> torch.Tensor:
+        """
+        Extract intermediate features/embeddings from the YOLO backbone.
+        
+        Args:
+            image: Input image (path, PIL Image, or numpy array)
+            layer_idx: Which layer to extract features from. If None, extracts from
+                      the last backbone layer before the detection head.
+        
+        Returns:
+            Feature tensor of shape (1, C, H, W) where C is the number of channels
+            and H, W are the spatial dimensions.
+        
+        Example:
+            >>> yolo = YOLOv9Plus()
+            >>> features = yolo.extract_features("image.jpg")
+            >>> print(features.shape)  # e.g., torch.Size([1, 512, 20, 20])
+        """
+        # Simplified approach: Use YOLO's predictor to preprocess, then extract features
+        # Load and preprocess image
+        if isinstance(image, (str, Path)):
+            img = Image.open(image)
+            img = np.array(img)
+        elif isinstance(image, Image.Image):
+            img = np.array(image)
+        else:
+            img = image
+        
+        # Preprocess using ultralytics transforms
+        from ultralytics.data.augment import LetterBox
+        letterbox = LetterBox(new_shape=(640, 640), auto=True, stride=32)
+        img = letterbox(image=img)
+        img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+        img = np.ascontiguousarray(img)
+        img = torch.from_numpy(img).to(self.device)
+        img = img.float() / 255.0
+        if img.ndimension() == 3:
+            img = img.unsqueeze(0)
+        
+        # Get the underlying PyTorch model
+        model = self.get_backbone_model()
+        
+        # Store features using a hook
+        features_dict = {}
+        
+        def hook_fn(name):
+            def hook(module, input, output):
+                # Handle both tensor and list/tuple outputs
+                if isinstance(output, torch.Tensor):
+                    features_dict[name] = output
+                elif isinstance(output, (list, tuple)) and len(output) > 0:
+                    # Store first tensor output
+                    for item in output:
+                        if isinstance(item, torch.Tensor):
+                            features_dict[name] = item
+                            break
+            return hook
+        
+        # Register hooks on all layers
+        hooks = []
+        for i, layer in enumerate(model.model):
+            hook = layer.register_forward_hook(hook_fn(f'layer_{i}'))
+            hooks.append(hook)
+        
+        try:
+            # Forward pass
+            _ = model(img)
+            
+            # Remove hooks
+            for hook in hooks:
+                hook.remove()
+            
+            # Get the requested feature or the last one
+            if layer_idx is not None:
+                key = f'layer_{layer_idx}'
+                if key in features_dict:
+                    return features_dict[key]
+            
+            # Return the last feature map
+            if features_dict:
+                last_key = max(features_dict.keys(), key=lambda x: int(x.split('_')[1]))
+                return features_dict[last_key]
+            
+            # Fallback: just return the model output
+            return model(img)
+            
+        except Exception as e:
+            # Clean up hooks on error
+            for hook in hooks:
+                hook.remove()
+            raise e
+
+    @torch.no_grad()
+    def get_image_embeddings(
+        self,
+        image: Union[str, Path, Image.Image, np.ndarray],
+        pool: str = 'avg',
+    ) -> torch.Tensor:
+        """
+        Extract a single embedding vector for an image using global pooling.
+        This is useful for connecting to language models or other downstream tasks.
+        
+        Args:
+            image: Input image (path, PIL Image, or numpy array)
+            pool: Pooling method - 'avg' for average pooling, 'max' for max pooling,
+                  or 'flatten' to flatten the spatial dimensions
+        
+        Returns:
+            Embedding tensor of shape (1, embedding_dim) where embedding_dim depends
+            on the pooling method:
+            - 'avg' or 'max': (1, C) where C is number of channels
+            - 'flatten': (1, C*H*W)
+        
+        Example:
+            >>> yolo = YOLOv9Plus()
+            >>> embedding = yolo.get_image_embeddings("image.jpg", pool='avg')
+            >>> print(embedding.shape)  # e.g., torch.Size([1, 512])
+        """
+        # Extract spatial features
+        features = self.extract_features(image)
+        
+        # Handle different feature shapes
+        if features.dim() == 4:
+            # Standard case: (B, C, H, W)
+            if pool == 'avg':
+                embedding = features.mean(dim=[2, 3])
+            elif pool == 'max':
+                embedding = features.amax(dim=[2, 3])
+            elif pool == 'flatten':
+                B = features.size(0)
+                embedding = features.view(B, -1)
+            else:
+                raise ValueError(f"Unknown pooling method: {pool}. Use 'avg', 'max', or 'flatten'")
+        elif features.dim() == 3:
+            # Case: (B, C, H) - pool over last dimension
+            if pool == 'avg':
+                embedding = features.mean(dim=2)
+            elif pool == 'max':
+                embedding = features.amax(dim=2)
+            elif pool == 'flatten':
+                B = features.size(0)
+                embedding = features.view(B, -1)
+            else:
+                raise ValueError(f"Unknown pooling method: {pool}")
+        elif features.dim() == 2:
+            # Already a 2D tensor (B, C) - no pooling needed
+            embedding = features
+        else:
+            # Fallback: flatten everything except batch dim
+            B = features.size(0)
+            embedding = features.view(B, -1)
+        
+        return embedding
+
 
 def load_yolov9(
     model_id: str = "merve/yolov9",

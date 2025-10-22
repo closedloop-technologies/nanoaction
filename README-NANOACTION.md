@@ -48,12 +48,72 @@ We should be able to pull down a pre-trained model from the nanochat repo and us
 
 - [x] Chat locally with the pre-trained model and confirm behavior is as expected
   - `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True && python -m scripts.chat_cli -p "Why is the sky blue?"`
-- [ ] Compare architecture of nanochat to existing VLMs like (<https://huggingface.co/blog/nanovlm>) and VLAs like Pi0.5 and OpenVLA
-- [ ] Review initial VLM extensions of nanochat like [make nanochat multimodal for < $10!](https://x.com/_rajanagarwal/status/1978376536152785368)
+- [x] Compare architecture of nanochat to existing VLMs like (<https://huggingface.co/blog/nanovlm>) and VLAs like Pi0.5 and OpenVLA
+- [x] Review initial VLM extensions of nanochat like [make nanochat multimodal for < $10!](https://x.com/_rajanagarwal/status/1978376536152785368)
+- [x] Implement multimodal vision-language integration with YOLOv9
+- [x] Test multimodal GPT on GPU with vision embeddings
 
-## Step 1: Working nanochat (with VL)
+## Step 1: Working nanochat (with VL) ✅
 
-The chat interface should accept one or more images and a text prompt.  The model should generate a response.
+**Status**: Complete! The multimodal vision-language integration is now working.
+
+### Architecture
+
+The system integrates **YOLOv9** vision embeddings with the GPT language model:
+
+- **Vision Encoder**: YOLOv9Plus extracts 84-dimensional embeddings from images
+- **Vision Projector**: Projects vision features to model embedding dimension
+- **Multimodal GPT**: Replaces special vision tokens with projected embeddings
+
+### Quick Start
+
+```python
+from nanochat.vision import YOLOv9Plus
+from nanochat.multimodal_gpt import create_multimodal_gpt, MultimodalGPTConfig
+from PIL import Image
+
+# Extract vision embeddings
+yolo = YOLOv9Plus(device='cuda')
+image = Image.open('robot_scene.jpg')
+vision_emb = yolo.get_image_embeddings(image)
+
+# Create multimodal model
+config = MultimodalGPTConfig(
+    sequence_len=256,
+    vocab_size=50257,
+    n_layer=12,
+    n_embd=768,
+    vision_embedding_dim=84,
+)
+model = create_multimodal_gpt(config, device='cpu')
+model.init_weights()
+model.to(device='cuda', dtype=torch.float32)
+
+# Generate text conditioned on image
+generated = model.generate_with_image(
+    prompt_tokens=[1, 2, 3],
+    image=image,
+    max_new_tokens=50
+)
+```
+
+### Testing
+
+Run the comprehensive test suite:
+
+```bash
+uv run python test_multimodal_gpu.py
+```
+
+### Documentation
+
+See [docs/MULTIMODAL.md](docs/MULTIMODAL.md) for complete documentation including:
+
+- Architecture details
+- Usage examples
+- Training with vision
+- Performance benchmarks
+- Troubleshooting guide
 
 ## Step 2: Train on robotics data
 
