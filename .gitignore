@@ -6,3 +6,4 @@ dev-ignore/
 .env
 report.md
 data
+*.pt
